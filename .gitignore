@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyCharm
+.idea
+
+# MacOS
+.DS_Store
+
+# Key files
+*.json
+
+*.tif
+*.aux.xml
+*.tmp
+*.ovr
+
+tasks.sh
+notes.txt
