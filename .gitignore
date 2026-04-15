@@ -20,5 +20,5 @@ __pycache__/
 *.tmp
 *.ovr
 
-tasks.sh
+tasks*.sh
 notes.txt
