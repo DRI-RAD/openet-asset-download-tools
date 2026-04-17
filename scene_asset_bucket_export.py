@@ -38,7 +38,7 @@ def main(
         reverse_flag=False,
         gee_key_file=None,
 ):
-    """
+    """Export OpenET overpass scene ET assets to bucket
 
     Parameters
     ----------
@@ -51,7 +51,7 @@ def main(
     start_dt : datetime
         Start date.
     end_dt : datetime
-        End date (inclusive).
+        End date (exclusive).
     delay_time : float, optional
         Delay time in seconds between starting export tasks (or checking the
         number of queued tasks, see "ready_task_max" parameter).
@@ -64,7 +64,7 @@ def main(
     wrs2_tiles : str, optional
         Comma separated WRS2 tiles to process (the default is None).
     export_properties_json : bool, optional
-        Export a properties JSON file for each image
+        Export a properties JSON file for each image.
     reverse_flag : bool, optional
         If True, process WRS2 tiles in reverse order (the default is False).
     gee_key_file : str, None, optional
@@ -530,14 +530,14 @@ def arg_parse():
         description='Export scene assets to bucket',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        '--model_name', choices=MODELS, metavar='MODEL',
-        help=f'ET model_name name (choices:{", ".join(MODELS)})')
+        '--model_name', required=True, choices=MODELS, metavar='MODEL',
+        help=f'OpenET model_name name (choices:{", ".join(MODELS)})')
     parser.add_argument(
-        '--start', required=True, type=utils.arg_valid_date, metavar='DATE',
-        help='Start date (format YYYY-MM-DD)')
+        '--start', required=True, type=utils.arg_valid_date, metavar='YYYY-MM-DD',
+        help='Start date')
     parser.add_argument(
-        '--end', required=True, type=utils.arg_valid_date, metavar='DATE',
-        help='End date (format YYYY-MM-DD)')
+        '--end', required=True, type=utils.arg_valid_date, metavar='YYYY-MM-DD',
+        help='End date (exclusive)')
     parser.add_argument(
         '--project', required=True, help='Google cloud project ID')
     parser.add_argument(

@@ -45,37 +45,43 @@ def main(
         cleanup=True,
         workers=10,
 ):
-    """
+    """Download OpenET monthly ET assets to COG
 
     Parameters
     ----------
     model_name : str
-    region : str
-    version : str
+        OpenET model name.
+    region : {'conus/gridmet', 'california/cimis'}
+        Reference ET dataset region .
+    version : {'v2_1', 'v2_0'}
+        OpenET collection version.
     start_dt : datetime,
         Start date
     end_dt : datetime
-        End date (inclusive)
+        End date (exclusive)
     project_id : str
         Google Cloud project ID to use for GEE initialization.
     workspace : str
+        Root folder where the images will be saved.
     mgrs_tiles : str, optional
         Comma separated UTM zones or MGRS tiles to process (the default is None).
     export_properties_json : bool, optional
-        Export a properties JSON file for each image
+        Export a properties JSON file for each image.
     overwrite_flag : bool, optional
         If True, overwrite existing files (the default is False).
     reverse_flag : bool, optional
         If True, process WRS2 tiles in reverse order (the default is False).
     gee_key_file : str, None, optional
         Earth Engine service account JSON key file (the default is None).
+        If set, this will be used instead of the cloud project ID for
+        initializing/authenticating GEE.
     cleanup : bool, optional,
         If True, remove temporary files
     workers : int, optional
         The number of workers to use in the xarray call (the default is 10).
 
     """
-    logging.info(f'\nExport {model_name} {region} month assets to COG')
+    logging.info(f'\nDownload {model_name} {region} month assets to COG')
 
     start_date = start_dt.strftime('%Y-%m-%d')
     end_date = end_dt.strftime('%Y-%m-%d')
@@ -227,9 +233,6 @@ def main(
 
             image_info = input_asset_props[image_id]
 
-            # TODO: Check that the input_bands are valid
-            # band_names = [b['id'] for b in image_info['bands']]
-
             input_img_id = f'{input_coll_id}/{image_id}'
             logging.debug(f'  Source: {input_img_id}')
 
@@ -281,6 +284,7 @@ def main(
                 blockxsize=512,
                 blockysize=512,
                 compress='lzw',
+                # compress='deflate',
                 count=len(output_bands),
                 dtype=dtype,
                 nodata=nodata,
@@ -450,23 +454,23 @@ def mgrs_export_tiles(
 def arg_parse():
     """"""
     parser = argparse.ArgumentParser(
-        description='Export month assets to COG',
+        description='Download OpenET monthly ET assets to COG',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        '--model', choices=MODELS, metavar='MODEL',
-        help=f'ET model name (choices:{", ".join(MODELS)})')
+        '--model', required=True, choices=MODELS, metavar='MODEL',
+        help=f'OpenET model name (choices:{", ".join(MODELS)})')
     parser.add_argument(
         '--region', choices=REGIONS, metavar='REGION', default='conus/gridmet',
         help=f'Region/dataset name (choices:{", ".join(REGIONS)})')
     parser.add_argument(
         '--version', choices=VERSIONS, metavar='VERSIONS', default='v2_1',
-        help=f'Version (choices:{", ".join(VERSIONS)})')
+        help=f'OpenET Collection version (choices:{", ".join(VERSIONS)})')
     parser.add_argument(
-        '--start', required=True, type=utils.arg_valid_date, metavar='DATE',
-        help='Start date (format YYYY-MM-DD)')
+        '--start', required=True, type=utils.arg_valid_date, metavar='YYYY-MM-DD',
+        help='Start date')
     parser.add_argument(
-        '--end', required=True, type=utils.arg_valid_date, metavar='DATE',
-        help='End date (format YYYY-MM-DD)')
+        '--end', required=True, type=utils.arg_valid_date, metavar='YYYY-MM-DD',
+        help='End date (exclusive)')
     parser.add_argument(
         '--project', required=True,
         help='Google cloud project ID to use for GEE authentication')

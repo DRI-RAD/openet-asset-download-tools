@@ -15,13 +15,11 @@ logging.getLogger('urllib3').setLevel(logging.INFO)
 
 TIMESTEPS = ['daily', 'monthly']
 REGIONS = ['conus/gridmet', 'california/cimis']
-VERSIONS = ['v1']
 
 
 def main(
         timestep,
         region,
-        version,
         start_dt,
         end_dt,
         bucket_name,
@@ -32,13 +30,14 @@ def main(
         reverse_flag=False,
         gee_key_file=None,
 ):
-    """
+    """Export OpenET referencet ET assets to bucket
 
     Parameters
     ----------
-    timestep : str
+    timestep : {'monthly', 'daily'}
+        Data timestep.
     region : str
-    version : str
+
     bucket_name : str
         Google Cloud Storage bucket name.
     project_id : str
@@ -46,7 +45,7 @@ def main(
     start_dt : datetime
         Start date.
     end_dt : datetime
-        End date (inclusive).
+        End date (exclusive).
     delay_time : float, optional
         Delay time in seconds between starting export tasks (or checking the
         number of queued tasks, see "ready_task_max" parameter).
@@ -55,7 +54,7 @@ def main(
         Maximum number of queued "READY" tasks.  The default is -1 which is
         implies no limit to the number of tasks that will be submitted.
     export_properties_json : bool, optional
-        Export a properties JSON file for each image
+        Export a properties JSON file for each image.
     reverse_flag : bool, optional
         If True, process WRS2 tiles in reverse order (the default is False).
     gee_key_file : str, None, optional
@@ -71,31 +70,34 @@ def main(
     logging.info(f'  Start: {start_date}')
     logging.info(f'  End:   {end_date}')
 
-    input_coll_id = f'projects/openet/assets/reference_et/{region.lower()}/{timestep.lower()}/{version.lower()}'
-    bucket_folder = f'reference_et/{region.lower()}/{timestep.lower()}/{version.lower()}'
-
     # Set the export parameters based on the region
     # Hardcoding for now but these could be read dynamically from the input collection
     if region.lower() == 'conus/gridmet':
+        version = 'v1'
+        input_coll_id = f'projects/openet/assets/reference_et/{region.lower()}/{timestep.lower()}/{version}'
+        bucket_folder = f'reference_et/{region.lower()}/{timestep.lower()}/{version}'
         export_params = {
             'crs': 'EPSG:4326',
             'dimensions': '1386x585',
             'crsTransform': [0.041666666666666664, 0, -124.7875, 0, -0.041666666666666664, 49.42083333333334],
             'maxPixels': int(1E10),
             'fileFormat': 'GeoTIFF',
-            'formatOptions': {'cloudOptimized': True, 'noData': -9999},
+            'formatOptions': {'cloudOptimized': False, 'noData': -9999},
             'fileFormat': 'GeoTIFF',
             # 'fileDimensions': 65536,
         }
-    # elif region == 'california/cimis':
-    #     export_params = {
-    #         'crs': 'EPSG:3310',
-    #         'dimensions': '560x510',
-    #         'crsTransform': [2000, 0, -410000.0, 0, -2000, 610000.0],
-    #         'maxPixels': int(1E10),
-    #         'fileFormat': 'GeoTIFF',
-    #         'formatOptions': {'cloudOptimized': True, 'noData': -9999},
-    #     }
+    elif region.lower() == 'california/cimis':
+        version = 'v1'
+        input_coll_id = f'projects/openet/assets/reference_et/{region.lower()}/{timestep.lower()}/{version}'
+        bucket_folder = f'reference_et/{region.lower()}/{timestep.lower()}/{version}'
+        export_params = {
+            'crs': 'EPSG:3310',
+            'dimensions': '510x560',
+            'crsTransform': [2000, 0, -410000.0, 0, -2000, 460000.0],
+            'maxPixels': int(1E10),
+            'fileFormat': 'GeoTIFF',
+            'formatOptions': {'cloudOptimized': False, 'noData': -9999},
+        }
     else:
         raise ValueError(f'Unsupported region: {region}')
 
@@ -165,9 +167,6 @@ def main(
     for image_id in sorted(input_id_list, reverse=reverse_flag):
         logging.info(f'{image_id}')
 
-        # The image IDs on the reference ET images are the date string
-        image_start_date = image_id
-
         input_img_id = f'{input_coll_id}/{image_id}'
         bucket_img = f'{bucket_folder}/{image_id}.tif'
         bucket_json = f'{bucket_folder}/{image_id}_properties.json'
@@ -177,7 +176,7 @@ def main(
 
         export_id = (
             f'reference_et_{region.lower().replace("/", "_")}_{timestep.lower()}_'
-            f'{version.lower()}_{image_start_date}_bucket_export'
+            f'{version.lower()}_{image_id}_bucket_export'
         )
         logging.debug(f'  Export ID: {export_id}')
 
@@ -257,15 +256,15 @@ def arg_parse():
     parser.add_argument(
         '--region', choices=REGIONS, metavar='REGION', default='conus/gridmet',
         help=f'Region/dataset name (choices:{", ".join(REGIONS)})')
+    # parser.add_argument(
+    #     '--version', choices=VERSIONS, metavar='VERSIONS', default='v1',
+    #     help=f'Version (choices:{", ".join(VERSIONS)})')
     parser.add_argument(
-        '--version', choices=VERSIONS, metavar='VERSIONS', default='v1',
-        help=f'Version (choices:{", ".join(VERSIONS)})')
+        '--start', required=True, type=utils.arg_valid_date, metavar='YYYY-MM-DD',
+        help='Start date')
     parser.add_argument(
-        '--start', required=True, type=utils.arg_valid_date, metavar='DATE',
-        help='Start date (format YYYY-MM-DD)')
-    parser.add_argument(
-        '--end', required=True, type=utils.arg_valid_date, metavar='DATE',
-        help='End date (format YYYY-MM-DD)')
+        '--end', required=True, type=utils.arg_valid_date, metavar='YYYY-MM-DD',
+        help='End date (exclusive)')
     parser.add_argument(
         '--project', required=True, help='Google cloud project ID')
     parser.add_argument(
@@ -297,7 +296,7 @@ if __name__ == "__main__":
     main(
         timestep=args.timestep,
         region=args.region,
-        version=args.version,
+        # version=args.version,
         start_dt=args.start,
         end_dt=args.end,
         project_id=args.project,
