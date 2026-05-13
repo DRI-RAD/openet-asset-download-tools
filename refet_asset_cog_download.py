@@ -218,23 +218,30 @@ def main(
         logging.debug('  Writing arrays')
         for band_index, band_name in enumerate(output_bands):
             logging.info(f'  Band: {band_name} ({band_index})')
-            output_xr = xarray.open_dataset(
-                output_img.select([band_name]),
-                engine='ee',
-                crs=crs,
-                crs_transform=crs_transform,
-                shape_2d=shape,
-                executor_kwargs={'max_workers': workers}
-            )
             try:
+                output_xr = xarray.open_dataset(
+                    output_img.select([band_name]),
+                    engine='ee',
+                    crs=crs,
+                    crs_transform=crs_transform,
+                    shape_2d=shape,
+                    executor_kwargs={'max_workers': workers}
+                )
                 output_array = output_xr[band_name].values[0, :, :]
             except Exception as e:
-                logging.info('  Error reading array data, skipping')
+                logging.error('  Error reading array data, skipping')
+                logging.error(f'  {e}')
                 os.remove(temp_path)
                 break
 
-            with rasterio.open(temp_path, 'r+') as output_ds:
-                output_ds.write(output_array, band_index + 1)
+            try:
+                with rasterio.open(temp_path, 'r+') as output_ds:
+                    output_ds.write(output_array, band_index + 1)
+            except Exception as e:
+                logging.error('  Error writing array data, skipping')
+                logging.error(f'  {e}')
+                os.remove(temp_path)
+                break
 
             del output_array
 

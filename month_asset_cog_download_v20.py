@@ -1,5 +1,4 @@
 import argparse
-from datetime import datetime
 import json
 import logging
 import os
@@ -126,12 +125,10 @@ def main(
         output_bands = input_bands[:]
     elif model_name.upper() in ['ENSEMBLE']:
         # TODO: Decide what bands to export for the ensemble images
-        # input_bands = ['et_ensemble_mad']
-        # output_bands = ['et']
-        # input_bands = ['et_ensemble_mad', 'et_ensemble_mad_index']
-        # output_bands = ['et', 'model_index']
-        input_bands = ['et_ensemble_mad', 'et_ensemble_mad_index', 'et_ensemble_mad_count']
-        output_bands = ['et', 'model_index', 'model_count']
+        input_bands = ['et_ensemble_mad']
+        output_bands = ['et']
+        # input_bands = ['et_ensemble_mad', 'et_ensemble_mad_index', 'et_ensemble_mad_count']
+        # output_bands = ['et', 'model_index', 'model_count']
         # input_bands = [
         #     'et_ensemble_mad', 'et_ensemble_mad_min', 'et_ensemble_mad_max',
         #     'et_ensemble_mad_index', 'et_ensemble_mad_count'
@@ -238,7 +235,7 @@ def main(
         # )
 
         for image_id in input_id_list:
-            logging.info(f'{image_id} ({datetime.now().strftime("%Y-%m-%d %H:%M")})')
+            logging.info(f'{image_id}')
 
             image_info = input_asset_props[image_id]
 
@@ -292,8 +289,8 @@ def main(
                 tiled=True,
                 blockxsize=512,
                 blockysize=512,
-                compress='deflate',
-                #compress='lzw',
+                compress='lzw',
+                # compress='deflate',
                 count=len(output_bands),
                 dtype=dtype,
                 nodata=nodata,
@@ -301,6 +298,7 @@ def main(
                 width=export_info['shape'][0],
                 crs=export_info['crs'],
                 transform=export_info['geo'],
+                BIGTIFF='YES',
             ) as output_ds:
                 for i, band_name in enumerate(output_bands):
                     output_ds.set_band_description(i+1, band_name)
@@ -309,30 +307,23 @@ def main(
             logging.debug('  Writing arrays')
             for band_index, band_name in enumerate(output_bands):
                 logging.info(f'  Band: {band_name} ({band_index})')
+                output_xr = xarray.open_dataset(
+                    output_img.select([band_name]),
+                    engine='ee',
+                    crs=export_info['crs'],
+                    crs_transform=tuple(export_info['geo']),
+                    shape_2d=export_info['shape'],
+                    executor_kwargs={'max_workers': workers}
+                )
                 try:
-                    output_xr = xarray.open_dataset(
-                        output_img.select([band_name]),
-                        engine='ee',
-                        crs=export_info['crs'],
-                        crs_transform=tuple(export_info['geo']),
-                        shape_2d=export_info['shape'],
-                        executor_kwargs={'max_workers': workers}
-                    )
                     output_array = output_xr[band_name].values[0, :, :]
                 except Exception as e:
-                    logging.error('  Error reading array data, skipping')
-                    logging.error(f'  {e}')
+                    logging.info('  Error reading array data, skipping')
                     os.remove(temp_path)
                     break
 
-                try:
-                    with rasterio.open(temp_path, 'r+') as output_ds:
-                        output_ds.write(output_array, band_index+1)
-                except Exception as e:
-                    logging.error('  Error writing array data, skipping')
-                    logging.error(f'  {e}')
-                    os.remove(temp_path)
-                    break
+                with rasterio.open(temp_path, 'r+') as output_ds:
+                    output_ds.write(output_array, band_index+1)
 
                 del output_array
 
@@ -344,7 +335,7 @@ def main(
             with rasterio.open(temp_path, 'r') as src_ds:
                 data = src_ds.read()
                 profile = src_ds.profile.copy()
-                profile.update(driver='COG', blocksize=512)
+                profile.update(driver='COG', blocksize=512, BIGTIFF='YES')
                 del profile['blockxsize']
                 del profile['blockysize']
                 del profile['tiled']
